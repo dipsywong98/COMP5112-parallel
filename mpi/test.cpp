@@ -1,4 +1,4 @@
-#include <stdio.h>
+#include <iostream>
 #include <string.h>  /* For strlen             */
 #include <mpi.h>     /* For MPI functions, etc */ 
 
@@ -18,23 +18,16 @@ int main(void) {
    /* Get my rank among all the processes */
    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank); 
 
-   int temp = 1;
+   int sum = 1;
 
-   if (my_rank != 0) { 
-      MPI_Send(&temp, 1, MPI_INT, 0, 0,
-            MPI_COMM_WORLD); 
-      MPI_Send(&temp, 1, MPI_INT, 0, 0,
-            MPI_COMM_WORLD); 
-   } else {  
-      /* Print my message */
-      printf("Greetings from process %d of %d!\n", my_rank, p);
-      for (int q = 1; q < p; q++) {
-         /* Receive message from process q */
-         MPI_Recv(&temp, 1, MPI_INT, q,
-            0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-         /* Print message from process q */
-         printf("%s\n", greeting);
-      } 
+   if(my_rank == 0) {
+      int a = 1;
+      MPI_Reduce(&a, &sum, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+   }else if(my_rank == 1) {
+      int b = 1;
+      MPI_Reduce(&b, &sum, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+   } else if(my_rank == 2) {
+      
    }
 
    /* Shut down MPI */
