@@ -76,10 +76,15 @@ int smith_waterman(int my_rank, int p, MPI_Comm comm, char *a, char *b,
   int block_height = 50;
 //  int block_send[block_width];
 //  int block_receive[block_width];
-  int prev_col[block_height];
-  int prev_row[block_width];
-  int next_col[block_height];
-  int block[block_height][block_width];
+  int *prev_col = new int[block_height];
+  int *prev_row = new int[block_width];
+  int *next_col = new int[block_height];
+  int *next_row = new int[block_width];
+  arr_set(next_col, 0, block_height);
+  arr_set(next_row, 0, block_width);
+  arr_set(prev_col, 0, block_height);
+  arr_set(prev_row, 0, block_width);
+//  memset(block,0, sizeof(block));
   int prev_corner = 0;
   MPI_Status status;
   Log log(my_rank);
@@ -103,60 +108,44 @@ int smith_waterman(int my_rank, int p, MPI_Comm comm, char *a, char *b,
       if (y != 0) {
         MPI_Recv(prev_row, block_width, MPI_INT, parent_rank, x / block_width, comm, MPI_STATUS_IGNORE);
       } else {
-        memset(prev_row, 0, sizeof(prev_row));
-        string out = "";
-//        for(int i = 0; i < block_width; i++){
-////        log()<<"hi\n";
-//        prev_row[i] = 0;
-//            out += (prev_row[i]+'0')+", ";
-//        }
-//        log()<<out;
+        arr_set(prev_row, 0, block_width);
       }
       const int height = min(block_height, a_len + 1 - y);
       const int width = min(block_width, b_len + 1 - x);
       for (int dy = 0; dy < height; dy++) {
+        prev_h = prev_col[dy];
+        if(dy>0){
+          prev_corner = prev_col[dy - 1];
+        }
         for (int dx = 0; dx < width; dx++) {
           const int i = x + dx;
           const int j = y + dy;
           h = 0;
+//          if(dy != 0 && dx != 0) {
+//            prev_corner = prev_row[dx - 1];
+//          }
+          log() << j << "," << i << ": " << prev_corner<< " " <<prev_h << " "<< prev_row[dx] << "\n";
+          h = max(h, prev_corner + sub_mat(a[j - 1], b[i - 1]));
+          h = max(h, prev_h - GAP);
+          h = max(h, prev_row[dx] - GAP);
 
-          if (dx != 0 && dy != 0) {
-            h = max(h, block[dy - 1][dx - 1] + sub_mat(a[j - 1], b[i - 1]));
-            h = max(h, block[dy][dx - 1] - GAP);
-            h = max(h, block[dy - 1][dx] - GAP);
-          } else {
-            if (dx == 0 && dy == 0) {
-//                log()<<j<<","<<i<<": "<<prev_corner<<" "<<prev_col[dy]<<" "<<prev_row[dx]<<'\n';
-
-              h = max(h, prev_corner + sub_mat(a[j - 1], b[i - 1]));
-              h = max(h, prev_col[dy] - GAP);
-              h = max(h, prev_row[dx] - GAP);
-            } else {
-              if (dx == 0) {
-                h = max(h, prev_col[dy - 1] + sub_mat(a[j - 1], b[i - 1]));
-                h = max(h, block[dy - 1][dx] - GAP);
-                h = max(h, prev_col[dy] - GAP);
-              } else {
-//                    log()<<j<<","<<i<<": "<<prev_row[dx - 1]<<" "<<block[dy][dx-1]<<" "<<prev_row[dx]<<'\n';
-                h = max(h, prev_row[dx - 1] + sub_mat(a[j - 1], b[i - 1]));
-                h = max(h, block[dy][dx - 1] - GAP);
-                h = max(h, prev_row[dx] - GAP);
-              }
-            }
-          }
-
-          block[dy][dx] = h;
+//          block[dy][dx] = h;
           max_h = max(h, max_h);
+          prev_h = h;
+          prev_corner = prev_row[dx];
+          prev_row[dx] = h;
 //          log() << j << "," << i << ":" << h << "\n";
-          if (dx == block_width - 1) {
+          if (dx == width - 1) {
             next_col[dy] = h;
           }
         }
       }
-//      memcpy(prev_col, next_col, block_height);
-      arr_cpy(prev_col, next_col, block_height);
+      int *tmp = next_col;
+      next_col = prev_col
+      prev_col = tmp;
+//      arr_cpy(prev_col, next_col, block_height);
       prev_corner = prev_row[block_width - 1];
-      MPI_Send(block[block_height - 1], block_width, MPI_INT, child_rank, x / block_width, comm);
+      MPI_Send(prev_row, block_width, MPI_INT, child_rank, x / block_width, comm);
     }
   }
 
@@ -175,6 +164,11 @@ int smith_waterman(int my_rank, int p, MPI_Comm comm, char *a, char *b,
     delete[] a;
     delete[] b;
   }
+
+  delete[] prev_col;
+  delete[] prev_row;
+  delete[] next_col;
+  delete[] next_row;
 
   return max_h;
 }
