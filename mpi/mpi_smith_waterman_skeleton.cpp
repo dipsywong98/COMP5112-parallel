@@ -45,6 +45,26 @@ public:
   }
 };
 
+void arr_set(int arr[], int val, int len) {
+  for (int i = 0; i < len; i++) {
+    arr[i] = val;
+  }
+}
+
+void arr_cpy(int a[], int b[], int len) {
+  for (int i = 0; i < len; i++) {
+    a[i] = b[i];
+  }
+}
+
+string arr_dump(int a[], int len) {
+  std::stringstream ss;
+  for (int i = 0; i < len; i++) {
+    ss << a[i] << " ";
+  }
+  return ss.str();
+}
+
 /*
  *  You can add helper functions and variables as you wish.
  */
@@ -52,14 +72,14 @@ public:
 int smith_waterman(int my_rank, int p, MPI_Comm comm, char *a, char *b,
                    int a_len, int b_len) {
   int max_h = 0, h = 0, temp = 0, prev_h = 0, prev_up = 0;
-  int block_width = 50;
+  int block_width = 5;
   int block_height = 50;
 //  int block_send[block_width];
 //  int block_receive[block_width];
-  int prev_col[block_height] = {};
-  int prev_row[block_width] = {};
-  int next_col[block_height] = {};
-  int block[block_height][block_width] = {};
+  int prev_col[block_height];
+  int prev_row[block_width];
+  int next_col[block_height];
+  int block[block_height][block_width];
   int prev_corner = 0;
   MPI_Status status;
   Log log(my_rank);
@@ -76,13 +96,21 @@ int smith_waterman(int my_rank, int p, MPI_Comm comm, char *a, char *b,
   const int parent_rank = (my_rank + p - 1) % p;
   const int child_rank = (my_rank + 1) % p;
 
-  for (int y = my_rank; y < a_len + 1; y += p * block_height) {
-    memset(prev_col, block_height, 0);
+  for (int y = my_rank * block_height; y < a_len + 1; y += p * block_height) {
+    memset(prev_col, 0, sizeof(prev_col));
+    prev_corner = 0;
     for (int x = 0; x < b_len + 1; x += block_width) {
       if (y != 0) {
         MPI_Recv(prev_row, block_width, MPI_INT, parent_rank, x / block_width, comm, MPI_STATUS_IGNORE);
-      } else{
-        memset(prev_row, block_width, 0);
+      } else {
+        memset(prev_row, 0, sizeof(prev_row));
+        string out = "";
+//        for(int i = 0; i < block_width; i++){
+////        log()<<"hi\n";
+//        prev_row[i] = 0;
+//            out += (prev_row[i]+'0')+", ";
+//        }
+//        log()<<out;
       }
       const int height = min(block_height, a_len + 1 - y);
       const int width = min(block_width, b_len + 1 - x);
@@ -91,41 +119,44 @@ int smith_waterman(int my_rank, int p, MPI_Comm comm, char *a, char *b,
           const int i = x + dx;
           const int j = y + dy;
           h = 0;
-          if (dx == 0) {
-            h = max(h, prev_col[dy] - GAP);
-          }else{
-            h = max(h, block[dy][dx-1] - GAP);
-          }
-          if (dy == 0) {
-            h = max(h, prev_row[dx] - GAP);
-          }else{
-            h = max(h, block[dy-1][dx] + sub_mat(a[j - 1], b[i - 1]));
-          }
-          if (dx == 0 && dy == 0) {
-            h = max(h, prev_corner + sub_mat(a[j - 1], b[i - 1]));
-          }else {
-            if(dx != 0 && dy != 0) {
-              h = max(h, block[dy-1][dx-1] + sub_mat(a[j - 1], b[i - 1]));
-            }else{
-              if(dx == 0) {
-                h = max(h, prev_col[dy-1] + sub_mat(a[j - 1], b[i - 1]));
-              }
-              if(dy == 0) {
-                h = max(h, prev_row[dx-1] + sub_mat(a[j - 1], b[i - 1]));
+
+          if (dx != 0 && dy != 0) {
+            h = max(h, block[dy - 1][dx - 1] + sub_mat(a[j - 1], b[i - 1]));
+            h = max(h, block[dy][dx - 1] - GAP);
+            h = max(h, block[dy - 1][dx] - GAP);
+          } else {
+            if (dx == 0 && dy == 0) {
+//                log()<<j<<","<<i<<": "<<prev_corner<<" "<<prev_col[dy]<<" "<<prev_row[dx]<<'\n';
+
+              h = max(h, prev_corner + sub_mat(a[j - 1], b[i - 1]));
+              h = max(h, prev_col[dy] - GAP);
+              h = max(h, prev_row[dx] - GAP);
+            } else {
+              if (dx == 0) {
+                h = max(h, prev_col[dy - 1] + sub_mat(a[j - 1], b[i - 1]));
+                h = max(h, block[dy - 1][dx] - GAP);
+                h = max(h, prev_col[dy] - GAP);
+              } else {
+//                    log()<<j<<","<<i<<": "<<prev_row[dx - 1]<<" "<<block[dy][dx-1]<<" "<<prev_row[dx]<<'\n';
+                h = max(h, prev_row[dx - 1] + sub_mat(a[j - 1], b[i - 1]));
+                h = max(h, block[dy][dx - 1] - GAP);
+                h = max(h, prev_row[dx] - GAP);
               }
             }
           }
+
           block[dy][dx] = h;
-          if(dx == width-1){
+          max_h = max(h, max_h);
+//          log() << j << "," << i << ":" << h << "\n";
+          if (dx == block_width - 1) {
             next_col[dy] = h;
           }
         }
       }
-      int *tmp = next_col;
-      next_col = prev_col;
-      prev_col = tmp;
-      prev_corner = block[block_height-1][block_width];
-      MPI_Send(block[block_height-1], block_width, MPI_INT, child_rank, x / block_width, comm);
+//      memcpy(prev_col, next_col, block_height);
+      arr_cpy(prev_col, next_col, block_height);
+      prev_corner = prev_row[block_width - 1];
+      MPI_Send(block[block_height - 1], block_width, MPI_INT, child_rank, x / block_width, comm);
     }
   }
 
