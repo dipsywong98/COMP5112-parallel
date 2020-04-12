@@ -94,7 +94,7 @@ int smith_waterman(int _num_threads, char *_a, char *_b, int _a_len, int _b_len)
   }
 
 //  delete[] sem;
-  delete[] max_H;
-  delete[] Left;
+//  delete[] max_H;
+//  delete[] Left;
   return ret;
 }

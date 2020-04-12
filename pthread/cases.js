@@ -94,7 +94,7 @@ const printWhenDone = () => {
       if (out[input][thread].score !== out[input].serial.score) {
         console.log(input, thread, out[input][thread].score, out[input].serial.score)
         out[input][thread].wrong = true
-        wrong.push({ input, thread })
+        wrong.push({ input, thread, serial: out[input].serial.score, parallel: out[input][thread].score })
       }
     })
   })
@@ -115,10 +115,9 @@ const printWhenDone = () => {
     }
   })
   if (wrong.length > 0) {
+    console.log('wrong')
     console.log(wrong)
   }
 }
-
-process.on('exit', printWhenDone.bind(null, { out }))
 
 main()
