@@ -1,7 +1,7 @@
 const { spawn, exec } = require('child_process')
 
 exec('scp pthreads_smith_waterman_skeleton.cpp ycwongal@csl2wk18.cse.ust.hk:~/COMP5112/pthread/')
-const p = spawn('sh', ['./run_pthreads.sh', 10, './datasets/20k.in'])
+const p = spawn('sh', ['./run_pthreads.sh', 2, './datasets/input1.txt'])
 p.stdout.on('data', data => onStdOut(data.toString()))
 p.stderr.on('data', data => onStdErr(data.toString()))
 p.on('exit', function (code) {
