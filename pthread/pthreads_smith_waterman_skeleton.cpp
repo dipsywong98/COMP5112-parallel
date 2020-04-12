@@ -72,10 +72,10 @@ void *Pth_smith_waterman(void *pRank) {
   int prevLeft = 0;
   for (int j = 0; j < a_len + 1; j++) {
     memset(currRow, block_size * sizeof(int), 0);
-    if (my_rank != 0 || j != 0) {
+    if (my_rank != 0) {
       sem_wait(&sem[my_rank]);
       prevLeft = currLeft;
-      currLeft = Left[my_rank];
+      currLeft = Left[my_rank*a_len + j];
     }
     for (int x = 0; x < x_cnt; x++) {
       int i = x + x_start;
@@ -98,10 +98,8 @@ void *Pth_smith_waterman(void *pRank) {
 //    log() << "hello" << j << "\n";
 //    for(int i = 0; i<10000; i++);
     if (my_rank != num_threads - 1) {
-      Left[my_rank + 1] = currRow[block_size - 1];
+      Left[(my_rank + 1)*a_len + j] = currRow[block_size - 1];
       sem_post(&sem[my_rank + 1]);
-    }else{
-      sem_post(&sem[0]);
     }
     int *tmp = currRow;
     currRow = prevRow;
@@ -128,7 +126,7 @@ int smith_waterman(int _num_threads, char *_a, char *_b, int _a_len, int _b_len)
   }
 
   max_H = new int[num_threads];
-  Left = new int[num_threads];
+  Left = new int[num_threads*a_len];
 
   memset(Left, num_threads * sizeof(int), 0);
 
