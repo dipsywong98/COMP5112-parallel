@@ -62,6 +62,7 @@ void *Pth_smith_waterman(void *pRank) {
   int block_size = max(50, (b_len + 1) / num_threads);
   int x_start = my_rank * block_size;
   int x_end = min((my_rank + 1) * block_size, b_len + 1);
+  if(my_rank == num_threads-1) x_end = b_len + 1;
   int x_cnt = x_end - x_start;
   int h = 0;
   long max_h = 0;
