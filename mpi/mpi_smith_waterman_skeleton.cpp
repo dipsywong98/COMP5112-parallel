@@ -61,6 +61,12 @@ int smith_waterman(int my_rank, int p, MPI_Comm comm, char* a, char* b,
   MPI_Bcast(a, a_len, MPI_CHAR, 0, MPI_COMM_WORLD);
   MPI_Bcast(b, b_len, MPI_CHAR, 0, MPI_COMM_WORLD);
 
+  if (my_rank == 1) {
+    MPI_Recv(&temp, 1, MPI_INT, 0, 0, comm, &status);
+  } else {
+    MPI_Send(&temp, 1, MPI_INT, 1, 0, comm);
+  }
+
   const int parent_rank = (my_rank + p - 1) % p;
   const int child_rank = (my_rank + 1) % p;
 
@@ -102,8 +108,6 @@ int smith_waterman(int my_rank, int p, MPI_Comm comm, char* a, char* b,
   } else {
     MPI_Send(&max_h, 1, MPI_INT, 0, a_len * b_len, comm);
   }
-
-  // MPI_Reduce(&max_h, &max_h, 1, MPI_INT, MPI_MAX, 0, comm);
 
   if(my_rank != 0){
     delete[] a;
