@@ -48,6 +48,13 @@ int smith_waterman(char *a, char *b, int a_len, int b_len) {
         }
     }
 
+int len = (a_len + 1) * (b_len + 1);
+  for(int id = 0; id < len; id++){
+    if(id % (b_len+1) == 0) std::cout<<std::endl;
+    std::cout<<score[id]<<" ";
+  }
+  std::cout<<endl;
+
 //    for (int i = 0; i <= a_len; i++) {
 //        delete [] score[i];
 //    }

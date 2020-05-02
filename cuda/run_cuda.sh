@@ -1,4 +1,9 @@
+if [ -n "$4"]
+then
+  nvcc -std=c++11 main.cu cuda_smith_waterman_skeleton.cu -o cuda_smith_waterman
+  else
 nvcc -std=c++11 -arch=compute_52 -code=sm_52 main.cu cuda_smith_waterman_skeleton.cu -o cuda_smith_waterman
+fi
 input=./datasets/1k.in
 num_block=4
 num_thread=32
