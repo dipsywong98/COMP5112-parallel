@@ -32,35 +32,25 @@ __global__ void cuda_sw(char *a, char *b, int a_len, int b_len, int *score, int 
   int I = b_len + 1;
   int J = a_len + 1;
   int max_score = 0;
-  for (int id = tid; id < len; id += tn) {
-    int x = id % I;
-    int y = id / I;
-//    if (y > prevy) {
-//      __syncthreads();
-//      prevy++;
-//    }
-//    if(prevy >= a_len+b_len+1){
-//      break;
-//    }
-//    if(id >= len){
-//      continue;
-//    }
-    int j = y - x;
-    int i = x;
-    if (i >= 1 && j >= 1 && i < I && j < J) {
-      int s = 0;
-      if(x>=1 && y >=2){
-        int ad = sub_mat(a[i - 1], b[j - 1]);
-        s = max(0, get(score,x - 1, y - 2, b_len + 1) + ad); //
+  for(int y = 0; y < a_len + b_len - 1; y++) {
+    for(int x = tid; x < b_len + 1; x+=tn) {
+      int j = y - x;
+      int i = x;
+      if (i >= 1 && j >= 1 && i < I && j < J) {
+        int s = 0;
+        if(x>=1 && y >=2){
+          int ad = sub_mat(a[i - 1], b[j - 1]);
+          s = max(0, score[idx(x - 1, y - 2, b_len + 1)] + ad); //
+        }
+        s = max(s, score[idx(x - 1, y - 1, b_len + 1)] - GAP);
+        s = max(s, score[idx(x, y - 1, b_len + 1)] - GAP);
+        max_score = max(max_score, s);
+        score[idx(x,y,b_len + 1)] = s;
+      } else {
+        score[idx(x,y,b_len + 1)] = 0;
       }
-      s = max(s, get(score,x - 1, y - 1, b_len + 1) - GAP);
-      s = max(s, get(score,x, y - 1, b_len + 1) - GAP);
-      max_score = max(max_score, s);
-      score[id] = s;
-    } else {
-      score[id] = 0;
     }
-
+    __syncthreads();
   }
   max_scores[tid] = max_score;
 }
