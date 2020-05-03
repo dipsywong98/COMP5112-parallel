@@ -18,7 +18,7 @@ inline __device__ int idx(int i, int j, int I) {
   return j * I + i;
 }
 
-__global__ void cuda_sw(char *a, char *b, int a_len, int b_len, int *score, int *max_scores, int y) {
+__global__ void cuda_sw(char *a, char *b, int a_len, int b_len, int *d_scores, int *max_scores, int y, int* d_scores1, int* d_scores2) {
   int tid = blockDim.x * blockIdx.x + threadIdx.x;
   int tn = blockDim.x * gridDim.x;
   int max_score = 0;
@@ -29,13 +29,13 @@ __global__ void cuda_sw(char *a, char *b, int a_len, int b_len, int *score, int 
     if (i >= 1 && j >= 1 && i <= b_len && j <= a_len) {
       if (y >= 2) {
         int ad = sub_mat(a[j - 1], b[i - 1]);
-        s = max(0, score[idx(x - 1, y - 2, b_len + 1)] + ad);
+        s = max(0, d_scores2[x-1] + ad);
       }
-      s = max(s, score[idx(x - 1, y - 1, b_len + 1)] - GAP);
-      s = max(s, score[idx(x, y - 1, b_len + 1)] - GAP);
+      s = max(s, d_scores1[x-1] - GAP);
+      s = max(s, d_scores1[x] - GAP);
       max_score = max(max_score, s);
     }
-    score[idx(x, y, b_len + 1)] = s;
+    d_scores[x] = s;
   }
   max_scores[tid] = max(max_scores[tid], max_score);
 }
@@ -62,7 +62,7 @@ int smith_waterman(int blocks_per_grid, int threads_per_block, char *_a, char *_
   int a_len;
   int b_len;
   int len;
-  int *d_scores;
+  int *d_scores, *d_scores1, *d_scores2;
   int max_score = 0;
   int tn = blocks_per_grid * threads_per_block;
   int *d_max_scores;
@@ -75,20 +75,26 @@ int smith_waterman(int blocks_per_grid, int threads_per_block, char *_a, char *_
     a = _b;
     b = _a;
   }
-  len = ((b_len + 1) * (a_len + 1 + b_len));
-//  scores = new int[(sizeof(int) * len)];
-  cudaMalloc(&d_scores, sizeof(int) * len);
+  cudaMalloc(&d_scores, sizeof(int) * (b_len + 1));
+  cudaMalloc(&d_scores1, sizeof(int) * (b_len + 1));
+  cudaMalloc(&d_scores2, sizeof(int) * (b_len + 1));
   cudaMalloc(&d_max_scores, sizeof(int) * tn);
   cudaMalloc(&d_a, sizeof(int) * a_len);
   cudaMemcpy(d_a, a, sizeof(int) * a_len, cudaMemcpyHostToDevice);
   cudaMalloc(&d_b, sizeof(int) * b_len);
   cudaMemcpy(d_b, b, sizeof(int) * b_len, cudaMemcpyHostToDevice);
-  cudaMemset(d_scores, 0, sizeof(int) * len);
+  cudaMemset(d_scores, 0, sizeof(int) * (b_len+1));
+  cudaMemset(d_scores1, 0, sizeof(int) * (b_len+1));
+  cudaMemset(d_scores2, 0, sizeof(int) * (b_len+1));
   cudaMemset(d_max_scores, 0, sizeof(int) * tn);
 
 //  cuda_sw<<<blocks, threads>>>(a, b, a_len, b_len, d_scores, len);
   for (int y = 0; y < a_len + b_len + 1; y++) {
-    cuda_sw <<< blocks, threads >>>(d_a, d_b, a_len, b_len, d_scores, d_max_scores, y);
+    cuda_sw <<< blocks, threads >>>(d_a, d_b, a_len, b_len, d_scores, d_max_scores, y, d_scores1, d_scores2);
+    int* t = d_scores2;
+    d_scores2 = d_scores1;
+    d_scores1 = d_scores;
+    d_scores = t;
   }
   maxOf<<< blocks, threads >>>(d_max_scores);
 

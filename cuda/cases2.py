@@ -89,7 +89,7 @@ def printWhenDone():
     for inp in inputs:
         for thread in settings:
             if out[inp][thread]['score'] != out[inp]['serial']['score']:
-                print(inp, thread, out[inp][thread]
+                print('WRONG ANSWER', inp, thread, out[inp][thread]
                 ['score'], out[inp]['serial']['score'])
                 out[inp][thread]['wrong'] = True
                 wrong.append((inp, thread))
