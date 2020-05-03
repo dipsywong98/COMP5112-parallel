@@ -5,6 +5,7 @@ import re
 inputs = [
     './datasets/sample.in',
     './datasets/1k.in',
+    './datasets/4k.in',
     './datasets/20k.in',
     './datasets/20k2k.in',
     './datasets/input1.txt',
@@ -15,12 +16,12 @@ inputs = [
     './datasets/input6.txt',
 ]
 
-threads = [
-    '1', '2', '4', '8', '16'
+settings = [
+    "4,8", "8,8", "8,256", "16,1024"
 ]
 
 out = {k: {t: {'score': None, 'time': None, 'wrong': False}
-           for t in threads + ['serial']} for k in inputs}
+           for t in settings + ['serial']} for k in inputs}
 
 
 def run(cmd):
@@ -37,13 +38,11 @@ def run(cmd):
 def main():
     print('compile')
     os.system(
-        '''nvcc -std=c++11 -arch=compute_52 -code=sm_52
-    main.cu
-    cuda_smith_waterman_skeleton.cu
-    -o cuda_smith_waterman
-    ''')
+        '''/usr/local/cuda/bin/nvcc -std=c++11  -arch=compute_52 -code=sm_52  main.cu    cuda_smith_waterman_skeleton.cu    -o cuda_smith_waterman    '''
+    )
 
     for inp in inputs:
+        print(inp, 'serial')
         _, stdout, stderr = run(['./serial/serial_smith_waterman', inp])
 
         on_std_out(stdout.decode('utf-8'),
@@ -51,19 +50,20 @@ def main():
         on_std_err(stderr.decode('utf-8'),
                    './serial/serial_smith_waterman', inp, 'serial')
 
-        for thread in threads:
-            print(thread, inp)
-            _, stdout, stderr = run(['./pthreads_smith_waterman', inp, thread])
+        for setting in settings:
+            [block, thread] = setting.split(',')
+            print(inp, block, thread)
+            _, stdout, stderr = run(['./cuda_smith_waterman', inp, block, thread])
             on_std_out(stdout.decode('utf-8'),
-                       './pthreads_smith_waterman', inp, thread)
+                       './cuda_smith_waterman', inp, setting)
             on_std_err(stderr.decode('utf-8'),
-                       './pthreads_smith_waterman', inp, thread)
+                       './cuda_smith_waterman', inp, setting)
     printWhenDone()
 
 
 def on_std_out(stdout, cmd, inp, num):
     stdout = re.sub(r'\s+', '', stdout)
-    if re.match(r'\d+', stdout):
+    if re.search(r'\d+', stdout):
         score = re.findall(r'\d+', stdout)[0]
         out[inp][num]['score'] = score
     else:
@@ -73,9 +73,12 @@ def on_std_out(stdout, cmd, inp, num):
 
 def on_std_err(stderr, cmd, inp, num):
     stderr = re.sub(r'\s+', '', stderr)
-    if re.match(r'^Time:([\d.e-]+)s$', stderr):
-        time = re.findall(r'^Time:([\d.e-]+)s$', stderr)[0]
-        out[inp][num]['time'] = time
+    if re.search(r'Time:([\d.e-]+)s', stderr):
+        times = re.findall(r'Time:([\d.e-]+)s', stderr)
+        if len(times) == 1:
+            out[inp][num]['time'] = times[0]
+        else:
+            out[inp][num]['time'] = "%s<br>%s"%(times[0],times[1])
     else:
         out[inp][num]['time'] = ''
         print(cmd, inp, num, stderr)
@@ -84,21 +87,22 @@ def on_std_err(stderr, cmd, inp, num):
 def printWhenDone():
     wrong = []
     for inp in inputs:
-        for thread in threads:
+        for thread in settings:
             if out[inp][thread]['score'] != out[inp]['serial']['score']:
                 print(inp, thread, out[inp][thread]
-                      ['score'], out[inp]['serial']['score'])
+                ['score'], out[inp]['serial']['score'])
                 out[inp][thread]['wrong'] = True
                 wrong.append((inp, thread))
     f = chr(10).join(map(
-        lambda thread: f"| n = {thread} | {' | '.join(map(lambda i: out[i][thread]['time'], inputs))} | ", threads))
+        lambda thread: f"\
+| n = {thread} | {' | '.join(map(lambda i: out[i][thread]['time'], inputs))} | ", settings))
     md = f"\
-    # Time \n\
-           \n\
-    |        | {' | '.join(map(lambda i: '`' + i + '`', inputs))} | \n\
-    | ------ | {' | '.join(map(lambda i: ' ----- ', inputs))} | \n\
-    | serial | {' | '.join(map(lambda i: out[i]['serial']['time'], inputs))} | \n\
-    {f}    "
+# Time \n\
+       \n\
+|        | {' | '.join(map(lambda i: '`' + i + '`', inputs))} | \n\
+| ------ | {' | '.join(map(lambda i: ' ----- ', inputs))} | \n\
+| serial | {' | '.join(map(lambda i: out[i]['serial']['time'], inputs))} | \n\
+{f}"
 
     print(md)
     with open('time.md', 'w') as f:
